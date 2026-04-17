@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>决策摇摇乐</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #f5f5f7;
+            color: #333;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 1;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            color: #4a6fa5;
+            z-index: 1;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 75vw;
+            max-width: 350px;
+            margin: 0 auto 30px;
+            z-index: 1;
+        }
+
+        #wheelCanvas {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            display: block;
+            z-index: 1;
+        }
+
+        #pointer {
+            position: absolute;
+            top: calc(50% - 60px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 35px solid #FF6B6B;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .spin-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #4a6fa5, #6b8fc5);
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .spin-btn:active {
+            transform: translate(-50%, -50%) scale(0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .spin-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .result {
+            font-size: 1.8rem;
+            margin: 20px 0;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            color: #4a6fa5;
+            animation: blink 1s infinite alternate;
+            width: 100%;
+            z-index: 1;
+        }
+
+        @keyframes blink {
+            0% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .options {
+            width: 100%;
+            margin: 20px 0;
+            z-index: 1;
+        }
+
+        .option-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+            z-index: 1;
+        }
+
+        .option-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .option-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            color: #333;
+            transition: border-color 0.3s ease;
+        }
+
+        .option-input:focus {
+            outline: none;
+            border-color: #4a6fa5;
+        }
+
+        .option-input::placeholder {
+            color: #999;
+        }
+
+        .history {
+            width: 100%;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+
+        .history h3 {
+            margin-bottom: 10px;
+            color: #4a6fa5;
+        }
+
+        .history-item {
+            padding: 5px;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: left;
+            color: #333;
+        }
+
+        .qr-btn {
+            margin-top: 20px;
+            padding: 15px 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            z-index: 1;
+        }
+
+        .qr-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .qr-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .qr-overlay.active {
+            display: flex;
+        }
+
+        .qr-modal {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 90%;
+        }
+
+        .qr-modal h3 {
+            margin-bottom: 20px;
+            color: #4a6fa5;
+        }
+
+        #qrcode {
+            display: flex;
+            justify-content: center;
+        }
+
+        .qr-close-btn {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 1rem;
+            color: white;
+            background: #4a6fa5;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        #petalCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>决策摇摇乐</h1>
+        <div class="wheel-container">
+            <div id="pointer"></div>
+            <canvas id="wheelCanvas"></canvas>
+            <button class="spin-btn" id="spinBtn">开始</button>
+        </div>
+        <div class="result" id="result">点击中心按钮开始</div>
+        <div class="options">
+            <div class="option-card">
+                <input type="text" class="option-input" placeholder="选项1" id="option1">
+            </div>
+            <div class="option-card">
+                <input type="text" class="option-input" placeholder="选项2" id="option2">
+            </div>
+            <div class="option-card">
+                <input type="text" class="option-input" placeholder="选项3" id="option3">
+            </div>
+            <div class="option-card">
+                <input type="text" class="option-input" placeholder="选项4" id="option4">
+            </div>
+        </div>
+        <div class="history">
+            <h3>历史记录</h3>
+            <div id="historyList"></div>
+        </div>
+        <button class="qr-btn" id="qrBtn">生成二维码</button>
+    </div>
+
+    <div class="qr-overlay" id="qrOverlay">
+        <div class="qr-modal">
+            <h3>扫描访问</h3>
+            <div id="qrcode"></div>
+            <button class="qr-close-btn" id="qrCloseBtn">关闭</button>
+        </div>
+    </div>
+
+    <canvas id="petalCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const petalCanvas = document.getElementById('petalCanvas');
+        const petalCtx = petalCanvas.getContext('2d');
+        const spinBtn = document.getElementById('spinBtn');
+        const result = document.getElementById('result');
+        const historyList = document.getElementById('historyList');
+        const qrBtn = document.getElementById('qrBtn');
+        const qrOverlay = document.getElementById('qrOverlay');
+        const qrCloseBtn = document.getElementById('qrCloseBtn');
+        const qrcodeContainer = document.getElementById('qrcode');
+
+        // 马卡龙颜色数组
+        const colors = [
+            '#FFB6C1',
+            '#87CEFA',
+            '#98FB98',
+            '#FFFACD',
+            '#E6E6FA',
+            '#FFDAB9',
+            '#B0E0E6',
+            '#FFA07A',
+            '#D8BFD8',
+            '#98D8C8'
+        ];
+
+        // 花瓣颜色
+        const petalColors = ['#FFB6C1', '#98FB98', '#FFFACD', '#87CEFA'];
+
+        // 历史记录
+        let history = [];
+        let currentRotation = 0;
+        let isSpinning = false;
+
+        // 粒子系统
+        let particles = [];
+        let animationFrameId = null;
+
+        // 粒子类
+        class Particle {
+            constructor() {
+                this.x = Math.random() * window.innerWidth;
+                this.y = -50; // 从屏幕顶部外生成
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = Math.random() * 3 + 1;
+                this.size = Math.random() * 10 + 5;
+                this.color = petalColors[Math.floor(Math.random() * petalColors.length)];
+                this.rotation = 0;
+                this.rotationSpeed = Math.random() * 0.1;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rotation += this.rotationSpeed;
+            }
+
+            draw() {
+                petalCtx.save();
+                petalCtx.translate(this.x, this.y);
+                petalCtx.rotate(this.rotation);
+                petalCtx.fillStyle = this.color;
+                petalCtx.beginPath();
+                petalCtx.arc(0, 0, this.size, 0, 2 * Math.PI);
+                petalCtx.fill();
+                petalCtx.restore();
+            }
+        }
+
+        // 初始化画布尺寸
+        function resizeCanvas() {
+            const container = document.querySelector('.wheel-container');
+            const containerWidth = container.offsetWidth;
+            
+            canvas.style.width = containerWidth + 'px';
+            canvas.style.height = containerWidth + 'px';
+            
+            const pixelRatio = window.devicePixelRatio || 1;
+            canvas.width = containerWidth * pixelRatio;
+            canvas.height = containerWidth * pixelRatio;
+            
+            ctx.scale(pixelRatio, pixelRatio);
+            
+            petalCanvas.width = window.innerWidth * pixelRatio;
+            petalCanvas.height = window.innerHeight * pixelRatio;
+            petalCtx.scale(pixelRatio, pixelRatio);
+            
+            drawWheel();
+        }
+
+        // 获取有效选项
+        function getOptions() {
+            const options = [
+                document.getElementById('option1').value,
+                document.getElementById('option2').value,
+                document.getElementById('option3').value,
+                document.getElementById('option4').value
+            ].filter(option => option.trim() !== '');
+            return options;
+        }
+
+        // 绘制转盘
+        function drawWheel() {
+            const options = getOptions();
+
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const pixelRatio = window.devicePixelRatio || 1;
+            const centerX = canvas.width / 2 / pixelRatio;
+            const centerY = canvas.height / 2 / pixelRatio;
+            const radius = (canvas.width / 2 / pixelRatio) - 20;
+
+            if (options.length === 0) {
+                // 绘制空状态
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#e0e0e0';
+                ctx.fill();
+                ctx.strokeStyle = '#ccc';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // 绘制文字
+                ctx.fillStyle = '#999';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('请输入选项', centerX, centerY);
+                
+                result.textContent = '请至少输入一个选项';
+                return;
+            }
+
+            const anglePerSector = (2 * Math.PI) / options.length;
+
+            // 绘制扇区
+            options.forEach((option, index) => {
+                const startAngle = index * anglePerSector - Math.PI / 2;
+                const endAngle = (index + 1) * anglePerSector - Math.PI / 2;
+
+                // 绘制扇形
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 绘制文字
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                const textAngle = startAngle + anglePerSector / 2;
+                ctx.rotate(textAngle);
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+
+                // 计算字体大小
+                const fontSize = Math.min(20, 200 / options.length);
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.fillStyle = '#333';
+                ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+                ctx.shadowBlur = 3;
+
+                // 在扇区中间位置绘制文字
+                const textRadius = radius * 0.65;
+                ctx.fillText(option, textRadius, 0);
+                ctx.restore();
+            });
+
+            // 绘制中心圆
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 40, 0, 2 * Math.PI);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            ctx.strokeStyle = '#4a6fa5';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
+        // 生成音效
+        function playClickSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            } catch (e) {
+                console.log('音效播放失败');
+            }
+        }
+
+        // 生成花瓣特效
+        function createPetals() {
+            // 清除旧的粒子
+            particles = [];
+            
+            // 生成新的粒子
+            for (let i = 0; i < 50; i++) {
+                particles.push(new Particle());
+            }
+            
+            // 开始动画
+            if (!animationFrameId) {
+                animateParticles();
+            }
+        }
+
+        // 粒子动画
+        function animateParticles() {
+            // 清除花瓣画布
+            petalCtx.clearRect(0, 0, petalCanvas.width, petalCanvas.height);
+            
+            // 更新和绘制粒子
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw();
+                
+                // 清理出屏幕的粒子
+                if (p.y > window.innerHeight) {
+                    particles.splice(i, 1);
+                }
+            }
+            
+            // 如果还有粒子，继续动画
+            if (particles.length > 0) {
+                animationFrameId = requestAnimationFrame(animateParticles);
+            } else {
+                // 停止动画
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+                // 清理花瓣画布
+                petalCtx.clearRect(0, 0, petalCanvas.width, petalCanvas.height);
+            }
+        }
+
+        // 旋转转盘
+        function spinWheel() {
+            const options = getOptions();
+
+            if (!options || options.length === 0) {
+                return;
+            }
+
+            if (isSpinning) return;
+            isSpinning = true;
+
+            // 震动效果
+            if (navigator.vibrate) {
+                navigator.vibrate(200);
+            }
+
+            // 禁用按钮
+            spinBtn.disabled = true;
+            spinBtn.textContent = '旋转中...';
+
+            // 重置当前旋转角度
+            currentRotation %= (Math.PI * 2);
+
+            // 计算目标旋转角度
+            const targetRotation = currentRotation + (Math.random() * 10 + 5) * Math.PI * 2;
+
+            // 播放音效
+            playClickSound();
+
+            // 动画时长（3-4秒）
+            const duration = 3000 + Math.random() * 1000;
+            const startTime = performance.now();
+
+            // 动画函数
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // ease-out 缓动
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                
+                // 计算当前旋转角度
+                const currentAngle = currentRotation + (targetRotation - currentRotation) * easeProgress;
+                
+                // 应用旋转
+                canvas.style.transform = `rotate(${currentAngle}rad)`;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    // 动画结束
+                    currentRotation = targetRotation;
+                    
+                    // 计算指针指向的扇区
+                    const anglePerSector = (2 * Math.PI) / options.length;
+                    const normalizedRotation = targetRotation % (2 * Math.PI);
+                    const pointerAngle = (2 * Math.PI - normalizedRotation + Math.PI / 2) % (2 * Math.PI);
+                    const winningIndex = Math.floor(pointerAngle / anglePerSector) % options.length;
+                    const selectedOption = options[winningIndex];
+
+                    result.textContent = `中奖啦！${selectedOption}`;
+
+                    // 生成花瓣特效
+                    createPetals();
+
+                    // 添加到历史记录
+                    history.unshift(selectedOption);
+                    if (history.length > 10) {
+                        history = history.slice(0, 10);
+                    }
+
+                    // 更新历史记录显示
+                    historyList.innerHTML = '';
+                    history.forEach(item => {
+                        const historyItem = document.createElement('div');
+                        historyItem.classList.add('history-item');
+                        historyItem.textContent = item;
+                        historyList.appendChild(historyItem);
+                    });
+
+                    // 启用按钮
+                    spinBtn.disabled = false;
+                    spinBtn.textContent = '开始';
+                    isSpinning = false;
+                }
+            }
+
+            // 开始动画
+            requestAnimationFrame(animate);
+        }
+
+        // 生成二维码
+        function generateQRCode() {
+            const currentUrl = window.location.href;
+            qrcodeContainer.innerHTML = '';
+            new QRCode(qrcodeContainer, {
+                text: currentUrl,
+                width: 200,
+                height: 200,
+                colorDark: '#4a6fa5',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            qrOverlay.classList.add('active');
+        }
+
+        // 关闭二维码
+        function closeQRCode() {
+            qrOverlay.classList.remove('active');
+        }
+
+        // 初始化
+        function init() {
+            resizeCanvas();
+
+            // 点击事件
+            spinBtn.addEventListener('click', spinWheel);
+
+            // 二维码按钮事件
+            qrBtn.addEventListener('click', generateQRCode);
+            qrCloseBtn.addEventListener('click', closeQRCode);
+            qrOverlay.addEventListener('click', function(e) {
+                if (e.target === qrOverlay) {
+                    closeQRCode();
+                }
+            });
+
+            // 输入框变化时重新绘制转盘
+            document.getElementById('option1').addEventListener('input', drawWheel);
+            document.getElementById('option2').addEventListener('input', drawWheel);
+            document.getElementById('option3').addEventListener('input', drawWheel);
+            document.getElementById('option4').addEventListener('input', drawWheel);
+
+            // 窗口大小变化时重新调整画布
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        // 注册Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(function(registration) {
+                        console.log('Service Worker 注册成功:', registration.scope);
+                    })
+                    .catch(function(error) {
+                        console.log('Service Worker 注册失败:', error);
+                    });
+            });
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>
